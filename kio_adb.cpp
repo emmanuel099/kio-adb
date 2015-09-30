@@ -141,7 +141,116 @@ void AdbProtocol::listDir(const QUrl &url)
 
         finished();
     } else {
-        // TODO list files/folders
+        QProcess process;
+        process.setProgram(QLatin1String("adb"));
+        process.setArguments({"-s", device, "shell", "ls", "-l", "-a", path});
+        process.setProcessChannelMode(QProcess::MergedChannels);
+        process.start();
+
+        process.waitForFinished();
+        const QString data = process.readAll();
+        const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
+
+        static QRegularExpression re("^(?<type>[\\-dlcbps])"
+                                     "(?<permission>[\\-rwxsStT]{9})\\s+"
+                                     "(?<owner>\\w+)\\s+"
+                                     "(?<group>\\w+)\\s+"
+                                     "((?<size>\\d+)\\s+)?"
+                                     "(?<datetime>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\s+"
+                                     "(?<name>.+)\\s$",
+                                     QRegularExpression::OptimizeOnFirstUsageOption);
+
+        foreach (const QString &line, lines) {
+            const auto match = re.match(line); // TODO try to use globalMatch instead
+            if (!match.hasMatch()) {
+                continue;
+            }
+
+            const auto parsePermission = [](const QString &permissionStr) -> int {
+                if (permissionStr.size() != 9) {
+                    return 0;
+                }
+
+                const auto parsePermissionChar = [](char c, int r, int w, int x, int s) -> int {
+                    switch (c) {
+                        case 'r':
+                            return r;
+                        case 'w':
+                            return w;
+                        case 'x':
+                            return x;
+                        case 't':
+                            return x | S_ISVTX;
+                        case 'T':
+                            return S_ISVTX;
+                        case 's':
+                            return x | s;
+                        case 'S':
+                            return s;
+                        case '-':
+                        default:
+                            return 0;
+                    }
+                };
+
+                int permissions = 0;
+
+                permissions |= parsePermissionChar(permissionStr[0].toLatin1(), S_IRUSR, S_IWUSR, S_IXUSR, S_ISUID);
+                permissions |= parsePermissionChar(permissionStr[1].toLatin1(), S_IRUSR, S_IWUSR, S_IXUSR, S_ISUID);
+                permissions |= parsePermissionChar(permissionStr[2].toLatin1(), S_IRUSR, S_IWUSR, S_IXUSR, S_ISUID);
+
+                permissions |= parsePermissionChar(permissionStr[3].toLatin1(), S_IRGRP, S_IWGRP, S_IXGRP, S_ISGID);
+                permissions |= parsePermissionChar(permissionStr[4].toLatin1(), S_IRGRP, S_IWGRP, S_IXGRP, S_ISGID);
+                permissions |= parsePermissionChar(permissionStr[5].toLatin1(), S_IRGRP, S_IWGRP, S_IXGRP, S_ISGID);
+
+                permissions |= parsePermissionChar(permissionStr[6].toLatin1(), S_IROTH, S_IWOTH, S_IXOTH, 0);
+                permissions |= parsePermissionChar(permissionStr[7].toLatin1(), S_IROTH, S_IWOTH, S_IXOTH, 0);
+                permissions |= parsePermissionChar(permissionStr[8].toLatin1(), S_IROTH, S_IWOTH, S_IXOTH, 0);
+
+                return permissions;
+            };
+
+            UDSEntry entry;
+
+            const QDateTime modificationTime = QDateTime::fromString(match.captured("datetime"), "yyyy-MM-dd HH:mm");
+            entry.insert(UDSEntry::UDS_MODIFICATION_TIME, modificationTime.toTime_t());
+
+            entry.insert(UDSEntry::UDS_USER, match.captured("owner"));
+            entry.insert(UDSEntry::UDS_GROUP, match.captured("group"));
+            entry.insert(UDSEntry::UDS_SIZE, match.captured("size").toULongLong());
+            entry.insert(UDSEntry::UDS_ACCESS, parsePermission(match.captured("permission")));
+            entry.insert(UDSEntry::UDS_NAME, match.captured("name"));
+
+            const QChar type = match.captured("type")[0];
+            if (type == QLatin1Char('-')) {
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFREG);
+            } else if (type == QLatin1Char('d')) {
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFDIR);
+                entry.insert(UDSEntry::UDS_MIME_TYPE, QLatin1String("inode/directory"));
+            } else if (type == QLatin1Char('l')) {
+                const QStringList nameParts = match.captured("name").split(QLatin1String(" -> "));
+                const auto name = nameParts[0];
+                const auto linkDest = nameParts[1];
+
+                QUrl targetUrl = url;
+                targetUrl.setPath(linkDest);
+
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFDIR); // S_IFLNK
+                entry.insert(UDSEntry::UDS_URL, targetUrl.url());
+                entry.insert(UDSEntry::UDS_LINK_DEST, linkDest);
+                entry.insert(UDSEntry::UDS_NAME, name);
+            } else if (type == QLatin1Char('c')) {
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFCHR);
+            } else if (type == QLatin1Char('b')) {
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFBLK);
+            } else if (type == QLatin1Char('p')) {
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFIFO);
+            } else if (type == QLatin1Char('s')) {
+                entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFSOCK);
+            }
+
+            listEntry(entry);
+        }
 
         finished();
     }
