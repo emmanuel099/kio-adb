@@ -129,7 +129,7 @@ void AdbProtocol::listDir(const QUrl &url)
 {
     qCDebug(KIO_ADB) << "listDir:" << url;
 
-    const QString device = url.host();
+    const QString device = url.authority();
     const QString path = url.path();
 
     if (device.isEmpty()) {
@@ -201,8 +201,13 @@ void AdbProtocol::listDevices()
             continue;
         }
 
+        QUrl url;
+        url.setScheme(QLatin1String("adb"));
+        url.setAuthority(match.captured("id"));
+        url.setPath("/");
+
         UDSEntry entry;
-        entry.insert(UDSEntry::UDS_URL, "adb://" + match.captured("id") +"/");
+        entry.insert(UDSEntry::UDS_URL, url.url());
         entry.insert(UDSEntry::UDS_NAME, match.captured("model"));
         entry.insert(UDSEntry::UDS_ICON_NAME, QLatin1String("smartphone"));
         entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFDIR);
