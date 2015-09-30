@@ -1,0 +1,2 @@
+# kio-adb
+adb kioslave
