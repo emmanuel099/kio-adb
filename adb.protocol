@@ -1,0 +1,19 @@
+[Protocol]
+exec=kf5/kio/adb
+protocol=adb
+input=none
+listing=Name,Type,Size,Date,AccessDate,Access,Owner,Group,Link,MimeType
+output=filesystem
+reading=true
+writing=true
+makedir=true
+deleting=true
+moving=true
+opening=true
+linking=true
+copyToFile=true
+copyFromFile=true
+Icon=smartphone
+maxInstances=20
+maxInstancesPerHost=1
+Description=A kioslave for adb
