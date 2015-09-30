@@ -130,9 +130,16 @@ void AdbProtocol::listDir(const QUrl &url)
     qCDebug(KIO_ADB) << "listDir:" << url;
 
     const QString device = url.host();
+    const QString path = url.path();
 
     if (device.isEmpty()) {
         listDevices();
+    } else if (path.isEmpty()) {
+        QUrl targetUrl = url;
+        targetUrl.setPath("/");
+        redirection(targetUrl);
+
+        finished();
     } else {
         // TODO list files/folders
 
