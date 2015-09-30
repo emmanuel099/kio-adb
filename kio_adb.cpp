@@ -26,6 +26,8 @@
 #include <QString>
 #include <QDateTime>
 #include <QByteArray>
+#include <QProcess>
+#include <QRegularExpression>
 
 using namespace KIO;
 
@@ -127,7 +129,15 @@ void AdbProtocol::listDir(const QUrl &url)
 {
     qCDebug(KIO_ADB) << "listDir:" << url;
 
-    finished();
+    const QString device = url.host();
+
+    if (device.isEmpty()) {
+        listDevices();
+    } else {
+        // TODO list files/folders
+
+        finished();
+    }
 }
 
 void AdbProtocol::mkdir(const QUrl &url, int permissions)
@@ -152,6 +162,48 @@ void AdbProtocol::virtual_hook(int id, void *data)
 void AdbProtocol::fileSystemFreeSpace(const QUrl &url)
 {
     qCDebug(KIO_ADB) << "fileSystemFreeSpace:" << url;
+
+    finished();
+}
+
+void AdbProtocol::listDevices()
+{
+    qCDebug(KIO_ADB) << "listDevices";
+
+    QProcess process;
+    process.setProgram(QLatin1String("adb"));
+    process.setArguments({"devices", "-l"});
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    process.start();
+
+    process.waitForFinished();
+    const QString data = process.readAll();
+    const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
+
+    static QRegularExpression re("^(?<id>\\S+)\\s+"
+                                 "device\\s+"
+                                 "(usb:(?<usb>\\S+)\\s+)?"
+                                 "product:(?<product>\\w+)\\s+"
+                                 "model:(?<model>\\w+)\\s+"
+                                 "device:(?<device>\\w+)$",
+                                 QRegularExpression::OptimizeOnFirstUsageOption);
+
+    foreach (const QString &line, lines) {
+        const auto match = re.match(line); // TODO try to use globalMatch instead
+        if (!match.hasMatch()) {
+            continue;
+        }
+
+        UDSEntry entry;
+        entry.insert(UDSEntry::UDS_URL, "adb://" + match.captured("id") +"/");
+        entry.insert(UDSEntry::UDS_NAME, match.captured("model"));
+        entry.insert(UDSEntry::UDS_ICON_NAME, QLatin1String("smartphone"));
+        entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFDIR);
+        entry.insert(UDSEntry::UDS_ACCESS, S_IRUSR | S_IRGRP | S_IROTH);
+        entry.insert(UDSEntry::UDS_MIME_TYPE, QLatin1String("inode/directory"));
+
+        listEntry(entry);
+    }
 
     finished();
 }

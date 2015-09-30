@@ -55,6 +55,7 @@ protected:
 
 private:
     void fileSystemFreeSpace(const QUrl &url);
+    void listDevices();
 };
 
 #endif // KIO_ADB_H
