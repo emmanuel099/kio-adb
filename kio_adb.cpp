@@ -151,14 +151,14 @@ void AdbProtocol::listDir(const QUrl &url)
         const QString data = process.readAll();
         const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
 
-        static QRegularExpression re("^(?<type>[\\-dlcbps])"
-                                     "(?<permission>[\\-rwxsStT]{9})\\s+"
-                                     "(?<owner>\\w+)\\s+"
-                                     "(?<group>\\w+)\\s+"
-                                     "((?<size>\\d+)\\s+)?"
-                                     "(?<datetime>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\s+"
-                                     "(?<name>.+)\\s$",
-                                     QRegularExpression::OptimizeOnFirstUsageOption);
+        static const QRegularExpression re("^(?<type>[\\-dlcbps])"
+                                           "(?<permission>[\\-rwxsStT]{9})\\s+"
+                                           "(?<owner>\\w+)\\s+"
+                                           "(?<group>\\w+)\\s+"
+                                           "((?<size>\\d+)\\s+)?"
+                                           "(?<datetime>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\s+"
+                                           "(?<name>.+)\\s$",
+                                           QRegularExpression::OptimizeOnFirstUsageOption);
 
         foreach (const QString &line, lines) {
             const auto match = re.match(line); // TODO try to use globalMatch instead
@@ -296,13 +296,13 @@ void AdbProtocol::listDevices()
     const QString data = process.readAll();
     const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
 
-    static QRegularExpression re("^(?<id>\\S+)\\s+"
-                                 "device\\s+"
-                                 "(usb:(?<usb>\\S+)\\s+)?"
-                                 "product:(?<product>\\w+)\\s+"
-                                 "model:(?<model>\\w+)\\s+"
-                                 "device:(?<device>\\w+)$",
-                                 QRegularExpression::OptimizeOnFirstUsageOption);
+    static const QRegularExpression re("^(?<id>\\S+)\\s+"
+                                       "device\\s+"
+                                       "(usb:(?<usb>\\S+)\\s+)?"
+                                       "product:(?<product>\\w+)\\s+"
+                                       "model:(?<model>\\w+)\\s+"
+                                       "device:(?<device>\\w+)$",
+                                       QRegularExpression::OptimizeOnFirstUsageOption);
 
     foreach (const QString &line, lines) {
         const auto match = re.match(line); // TODO try to use globalMatch instead
