@@ -149,7 +149,6 @@ void AdbProtocol::listDir(const QUrl &url)
 
         process.waitForFinished();
         const QString data = process.readAll();
-        const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
 
         static const QRegularExpression re("^(?<type>[\\-dlcbps])"
                                            "(?<permission>[\\-rwxsStT]{9})\\s+"
@@ -158,13 +157,12 @@ void AdbProtocol::listDir(const QUrl &url)
                                            "((?<size>\\d+)\\s+)?"
                                            "(?<datetime>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\s+"
                                            "(?<name>.+)\\s$",
-                                           QRegularExpression::OptimizeOnFirstUsageOption);
+                                           QRegularExpression::OptimizeOnFirstUsageOption |
+                                           QRegularExpression::MultilineOption);
 
-        foreach (const QString &line, lines) {
-            const auto match = re.match(line); // TODO try to use globalMatch instead
-            if (!match.hasMatch()) {
-                continue;
-            }
+        auto it = re.globalMatch(data);
+        while (it.hasNext()) {
+            const auto match = it.next();
 
             const auto parsePermission = [](const QString &permissionStr) -> int {
                 if (permissionStr.size() != 9) {
@@ -295,19 +293,17 @@ void AdbProtocol::fileSystemFreeSpace(const QUrl &url)
 
     process.waitForFinished();
     const QString data = process.readAll();
-    const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
 
     static const QRegularExpression re("(?<size>\\d+[KMGT]?)\\s+"
                                        "(?<used>\\d+[KMGT]?)\\s+"
                                        "(?<free>\\d+[KMGT]?)\\s+"
                                        "(?<blksize>\\d+)\\s$",
-                                       QRegularExpression::OptimizeOnFirstUsageOption);
+                                       QRegularExpression::OptimizeOnFirstUsageOption |
+                                       QRegularExpression::MultilineOption);
 
-    foreach (const QString &line, lines) {
-        const auto match = re.match(line); // TODO try to use globalMatch instead
-        if (!match.hasMatch()) {
-            continue;
-        }
+    auto it = re.globalMatch(data);
+    while (it.hasNext()) {
+        const auto match = it.next();
 
         const auto toBytes = [](QString size) -> qulonglong {
             double multiplier;
@@ -367,7 +363,6 @@ void AdbProtocol::listDevices()
 
     process.waitForFinished();
     const QString data = process.readAll();
-    const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
 
     static const QRegularExpression re("^(?<id>\\S+)\\s+"
                                        "device\\s+"
@@ -375,13 +370,12 @@ void AdbProtocol::listDevices()
                                        "product:(?<product>\\w+)\\s+"
                                        "model:(?<model>\\w+)\\s+"
                                        "device:(?<device>\\w+)$",
-                                       QRegularExpression::OptimizeOnFirstUsageOption);
+                                       QRegularExpression::OptimizeOnFirstUsageOption |
+                                       QRegularExpression::MultilineOption);
 
-    foreach (const QString &line, lines) {
-        const auto match = re.match(line); // TODO try to use globalMatch instead
-        if (!match.hasMatch()) {
-            continue;
-        }
+    auto it = re.globalMatch(data);
+    while (it.hasNext()) {
+        const auto match = it.next();
 
         QUrl url;
         url.setScheme(QLatin1String("adb"));
