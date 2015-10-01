@@ -279,7 +279,80 @@ void AdbProtocol::fileSystemFreeSpace(const QUrl &url)
 {
     qCDebug(KIO_ADB) << "fileSystemFreeSpace:" << url;
 
-    finished();
+    const auto device = url.authority();
+    const auto path = url.path();
+
+    if (device.isEmpty() or path.isEmpty()) {
+        error(KIO::ERR_MALFORMED_URL, url.toDisplayString());
+        return;
+    }
+
+    QProcess process;
+    process.setProgram(QLatin1String("adb"));
+    process.setArguments({"-s", device, "shell", "df", /*"-k",*/ path});
+    process.setProcessChannelMode(QProcess::MergedChannels);
+    process.start();
+
+    process.waitForFinished();
+    const QString data = process.readAll();
+    const QStringList lines = data.split(QLatin1Char('\n'), QString::SkipEmptyParts);
+
+    static const QRegularExpression re("(?<size>\\d+[KMGT]?)\\s+"
+                                       "(?<used>\\d+[KMGT]?)\\s+"
+                                       "(?<free>\\d+[KMGT]?)\\s+"
+                                       "(?<blksize>\\d+)\\s$",
+                                       QRegularExpression::OptimizeOnFirstUsageOption);
+
+    foreach (const QString &line, lines) {
+        const auto match = re.match(line); // TODO try to use globalMatch instead
+        if (!match.hasMatch()) {
+            continue;
+        }
+
+        const auto toBytes = [](QString size) -> qulonglong {
+            double multiplier;
+            if (size.endsWith(QLatin1Char('K'))) {
+                multiplier = pow(10.0, 3.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('M'))) {
+                multiplier = pow(10.0, 6.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('G'))) {
+                multiplier = pow(10.0, 9.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('T'))) {
+                multiplier = pow(10.0, 12.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('P'))) {
+                multiplier = pow(10.0, 15.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('E'))) {
+                multiplier = pow(10.0, 18.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('Z'))) {
+                multiplier = pow(10.0, 21.0);
+                size.chop(1);
+            } else if (size.endsWith(QLatin1Char('Y'))) {
+                multiplier = pow(10.0, 24.0);
+                size.chop(1);
+            } else {
+                multiplier = 1.0;
+            }
+
+            return round(size.toDouble() * multiplier);
+        };
+
+        const auto total = match.captured("size");
+        const auto available = match.captured("free");
+
+        setMetaData(QStringLiteral("total"), QString::number(toBytes(total)));
+        setMetaData(QStringLiteral("available"), QString::number(toBytes(available)));
+
+        finished();
+        return;
+    }
+
+    error(KIO::ERR_COULD_NOT_STAT, url.toDisplayString());
 }
 
 void AdbProtocol::listDevices()
