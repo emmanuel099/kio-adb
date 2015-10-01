@@ -228,9 +228,9 @@ void AdbProtocol::listDir(const QUrl &url)
                 entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFDIR);
                 entry.insert(UDSEntry::UDS_MIME_TYPE, QLatin1String("inode/directory"));
             } else if (type == QLatin1Char('l')) {
-                const QStringList nameParts = match.captured("name").split(QLatin1String(" -> "));
-                const auto name = nameParts[0];
-                const auto linkDest = nameParts[1];
+                const auto nameLink = match.captured("name");
+                const auto name = nameLink.section(" -> ", 0, -2);
+                const auto linkDest = nameLink.section(" -> ", -1);
 
                 QUrl targetUrl = url;
                 targetUrl.setPath(linkDest);
