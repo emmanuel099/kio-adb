@@ -156,7 +156,7 @@ void AdbProtocol::listDir(const QUrl &url)
                                            "(?<group>\\w+)\\s+"
                                            "((?<size>\\d+)\\s+)?"
                                            "(?<datetime>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\s+"
-                                           "(?<name>.+)\\s$",
+                                           "(?<name>.+)$",
                                            QRegularExpression::OptimizeOnFirstUsageOption |
                                            QRegularExpression::MultilineOption);
 
@@ -217,7 +217,7 @@ void AdbProtocol::listDir(const QUrl &url)
             entry.insert(UDSEntry::UDS_GROUP, match.captured("group"));
             entry.insert(UDSEntry::UDS_SIZE, match.captured("size").toULongLong());
             entry.insert(UDSEntry::UDS_ACCESS, parsePermission(match.captured("permission")));
-            entry.insert(UDSEntry::UDS_NAME, match.captured("name"));
+            entry.insert(UDSEntry::UDS_NAME, match.captured("name").trimmed());
 
             const QChar type = match.captured("type")[0];
             if (type == QLatin1Char('-')) {
@@ -226,7 +226,7 @@ void AdbProtocol::listDir(const QUrl &url)
                 entry.insert(UDSEntry::UDS_FILE_TYPE, S_IFDIR);
                 entry.insert(UDSEntry::UDS_MIME_TYPE, QLatin1String("inode/directory"));
             } else if (type == QLatin1Char('l')) {
-                const auto nameLink = match.captured("name");
+                const auto nameLink = match.captured("name").trimmed();
                 const auto name = nameLink.section(" -> ", 0, -2);
                 const auto linkDest = nameLink.section(" -> ", -1);
 
